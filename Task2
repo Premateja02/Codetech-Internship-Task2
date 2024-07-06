@@ -1,0 +1,87 @@
+/*Vulnerability Scanning Tool*/
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+
+public class VulnerabilityScanner {
+
+    // Function to run Nmap command and get open ports
+    public static List<String> scanOpenPorts(String target) {
+        List<String> openPorts = new ArrayList<>();
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder("nmap", "-p-", target);
+            Process process = processBuilder.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.contains("/tcp") && line.contains("open")) {
+                    openPorts.add(line);
+                }
+            }
+            process.waitFor();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return openPorts;
+    }
+
+    // Function to check software version from HTTP headers
+    public static String checkSoftwareVersion(String url) {
+        String versionInfo = "";
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            HttpResponse response = httpClient.execute(request);
+            HttpEntity entity = response.getEntity();
+            if (entity != null) {
+                versionInfo = EntityUtils.toString(entity);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return versionInfo;
+    }
+
+    // Function to check basic misconfigurations (example: X-Frame-Options header)
+    public static boolean checkMisconfigurations(String url) {
+        boolean misconfigurationFound = false;
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            HttpResponse response = httpClient.execute(request);
+            if (response.getFirstHeader("X-Frame-Options") == null) {
+                misconfigurationFound = true;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return misconfigurationFound;
+    }
+
+    public static void main(String[] args) {
+        String target = "example.com";
+        String url = "http://" + target;
+
+        // Scan for open ports
+        List<String> openPorts = scanOpenPorts(target);
+        System.out.println("Open Ports:");
+        openPorts.forEach(System.out::println);
+
+        // Check for software version
+        String versionInfo = checkSoftwareVersion(url);
+        System.out.println("Software Version Info:");
+        System.out.println(versionInfo);
+
+        // Check for basic misconfigurations
+        boolean misconfigurations = checkMisconfigurations(url);
+        System.out.println("Misconfigurations found: " + misconfigurations);
+    }
+}
